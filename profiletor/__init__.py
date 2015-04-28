@@ -348,6 +348,11 @@ class Measure(object):
         if self.__is_first:
             TornadoProfiler.stack_balancer[self.parent_key] += iter_time
 
+        if not self.__is_gen:
+            TornadoProfiler.work_time[self.gen_live_key] += iter_time
+            TornadoProfiler.last_work_time[self.gen_live_key] = iter_time
+            return
+
         if not (self.__is_gen and (type is StopIteration or type is Return)):
             return
 
