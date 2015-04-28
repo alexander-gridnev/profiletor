@@ -226,8 +226,6 @@ class TornadoProfiler(object):
             count = cls.call_count[key]
             if path is None or cls.pathes_in_item(path, item[0][0]) and count:
                 t = (item[1], str((item[1]/measure_time * 100) if measure_time else 0) + "%", count, item[1]/float(count)) + tuple((i for i in item[0]))
-                if key in TornadoProfiler.last_work_time:
-                    t = t + (str(TornadoProfiler.last_work_time[key]),)
 
                 result.append(t)
 
@@ -371,6 +369,18 @@ class Measure(object):
             self.measurer_time[self.func_key] = now
 
 
+table_header = '<th>' \
+                    '<td>Sum</td>' \
+                    '<td>Percent</td>' \
+                    '<td>Call num</td>' \
+                    '<td>Avg call time</td>' \
+                    '<td>File</td>' \
+                    '<td>Name</td>' \
+                    '<td>First line</td>' \
+                    '<td>Start line</td>' \
+                    '<td>End line</td>' \
+                '</th>'
+
 class ProfilerHandler(RequestHandler):
     def get(self):
         build_exec = self.get_query_argument('exec', 1)
@@ -385,12 +395,14 @@ class ProfilerHandler(RequestHandler):
             exec_time = ''
 
             if int(build_exec) == 1:
+                exec_time += table_header
                 for s in stats:
                     exec_time += '<tr><td>' + '</td><td>'.join(tuple_normalize(s)) + '</td></tr>'
 
             stats = TornadoProfiler.coroutine_real_time_stats()
             real_time = ''
             if int(build_real) == 1:
+                real_time += table_header
                 for s in stats:
                     real_time += '<tr><td>' + '</td><td>'.join(tuple_normalize(s)) + '</td></tr>'
 
