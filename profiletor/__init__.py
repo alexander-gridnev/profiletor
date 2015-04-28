@@ -369,17 +369,17 @@ class Measure(object):
             self.measurer_time[self.func_key] = now
 
 
-table_header = '<th>' \
-                    '<td>Sum</td>' \
-                    '<td>Percent</td>' \
-                    '<td>Call num</td>' \
-                    '<td>Avg call time</td>' \
-                    '<td>File</td>' \
-                    '<td>Name</td>' \
-                    '<td>First line</td>' \
-                    '<td>Start line</td>' \
-                    '<td>End line</td>' \
-                '</th>'
+table_header = '<tr>' \
+                    '<th>Sum</th>' \
+                    '<th>Percent</th>' \
+                    '<th>Call num</th>' \
+                    '<th>Avg call time</th>' \
+                    '<th>File</th>' \
+                    '<th>Name</th>' \
+                    '<th>First line</th>' \
+                    '<th>Start line</th>' \
+                    '<th>End line</th>' \
+                '</tr>'
 
 class ProfilerHandler(RequestHandler):
     def get(self):
