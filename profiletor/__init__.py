@@ -7,6 +7,7 @@ import sys
 import types
 import weakref
 import time
+import sys
 
 from tornado.concurrent import Future, TracebackFuture, is_future, chain_future
 from tornado.ioloop import IOLoop
@@ -166,6 +167,7 @@ class TornadoProfiler(object):
     call_time = collections.defaultdict(float)
     last_work_time = collections.defaultdict(float)
     work_time = collections.defaultdict(float)
+    stack_balancer = collections.defaultdict(float)
     path_filter = None
 
     @classmethod
@@ -187,7 +189,7 @@ class TornadoProfiler(object):
             return max([time for key, time in cls.work_time.iteritems() if path is None or cls.pathes_in_item(path, key[0])])
         except:
             pass
-    
+
     @classmethod
     def coroutine_exec_time_stats(cls, path=None):
         return cls.generate_stats(cls.call_time, path)
@@ -222,8 +224,8 @@ class TornadoProfiler(object):
         for item in stats:
             key = item[0]
             count = cls.call_count[key]
-            if  path is None or cls.pathes_in_item(path, item[0][0]):
-                t = (item[1], str(item[1]/measure_time * 100) + "%", count, item[1]/float(count)) + tuple((i for i in item[0]))
+            if path is None or cls.pathes_in_item(path, item[0][0]) and count:
+                t = (item[1], str((item[1]/measure_time * 100) if measure_time else 0) + "%", count, item[1]/float(count)) + tuple((i for i in item[0]))
                 if key in TornadoProfiler.last_work_time:
                     t = t + (str(TornadoProfiler.last_work_time[key]),)
 
@@ -258,6 +260,7 @@ class Measure(object):
     measurer_time = {}
 
     def __init__(self, f, first=False):
+        self.__is_first = first
         self.__start_time = time.time() if first else None
         self.__iter_start_time = None
         self.__func = f
@@ -284,6 +287,8 @@ class Measure(object):
 
             self.__filename = self.__func.__code__.co_filename
 
+        if self.__is_first:
+            self.__callingframe = sys._getframe(2)
 
     @property
     def filename(self):
@@ -313,15 +318,19 @@ class Measure(object):
 
     @property
     def key(self):
-        return (self.filename, self.name, self.first_line, self.start_line, self.end_line, self.name)
+        return self.filename, self.name, self.first_line, self.start_line, self.end_line
+
+    @property
+    def parent_key(self):
+        return self.__callingframe.f_code.co_filename, self.__callingframe.f_code.co_name, self.__callingframe.f_code.co_firstlineno
 
     @property
     def func_key(self):
-        return (self.filename, self.name, self.first_line, self.name)
+        return self.filename, self.name, self.first_line
 
     @property
     def gen_live_key(self):
-        return (self.filename, self.name, self.first_line, 0, 0, self.name)
+        return self.filename, self.name, self.first_line, 0, 0
 
     def __enter__(self):
         self.__iter_start_time = time.time()
@@ -329,11 +338,15 @@ class Measure(object):
 
     def __exit__(self, type, value, traceback):
         iter_time = float(time.time() - self.__iter_start_time)
-
         key = self.key
 
+        balancer_value = TornadoProfiler.stack_balancer[self.func_key]
+        TornadoProfiler.stack_balancer[self.func_key] = 0
         TornadoProfiler.call_count[key] += 1
-        TornadoProfiler.call_time[key] += iter_time
+        TornadoProfiler.call_time[key] += iter_time - balancer_value
+
+        if self.__is_first:
+            TornadoProfiler.stack_balancer[self.parent_key] += iter_time
 
         if not (self.__is_gen and (type is StopIteration or type is Return)):
             return
@@ -376,7 +389,7 @@ class ProfilerHandler(RequestHandler):
                 for s in stats:
                     real_time += '<tr><td>' + '</td><td>'.join(tuple_normalize(s)) + '</td></tr>'
 
-            
+
             result = result % (exec_time, real_time)
         else:
             result = TornadoProfiler.work_time_dict()
